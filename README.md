@@ -42,22 +42,6 @@ This system allows real-time data monitoring from ESP32 devices, including soil 
 
 ---
 
-## 📁 Project Structureproject/
-│── src/
-│ ├── pages/
-│ ├── components/
-│ ├── firebase/
-│ │ └── firebase.js
-│ └── App.jsx
-│
-│── public/
-│── .env
-│── Dockerfile
-│── docker-compose.yml
-│── package.json
-└── README.md
-
-
 ---
 
 ## 🔧 Installation
@@ -70,9 +54,11 @@ cd Plantzen
 ### 2 Install Client Dependencies
 ```bash
 npm install
+```
 
 ### 3 Create Environment File 
 Create .env in the root directory:
+```
 VITE_API_KEY=yourApiKey
 VITE_AUTH_DOMAIN=yourproject.firebaseapp.com
 VITE_DB_URL=https://yourproject-default-rtdb.firebaseio.com
@@ -80,16 +66,21 @@ VITE_PROJECT_ID=yourproject
 VITE_STORAGE_BUCKET=yourproject.appspot.com
 VITE_SENDER_ID=123456789
 VITE_APP_ID=1:123456789:web:abcdef123456
+```
 
 ### Run With Docker 🐳
+Using docker is optional for this case if you want to run the frontend only. But if you want to run the n8n, then run docker with : 
 #### Build and Run
 ```bash
 docker compose up --build
+```
 #### Stop Containers
 ```bash
 docker compose down
+```
 
 ### Access the app
 After the services are running, open:
 ```bash
 http://localhost:5173
+```
