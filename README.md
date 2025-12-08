@@ -1,16 +1,95 @@
-# React + Vite
+# 🌱 Plantzen
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack IoT plant monitoring platform built using **React**, **Firebase Realtime Database**, **Docker**, and **n8n** for workflow automation.  
+This system allows real-time data monitoring from ESP32 devices, including soil moisture, temperature, humidity, light intensity, battery level, and network strength.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Features
 
-## React Compiler
+### 🖥️ Frontend (React + Vite)
+- Modern UI for Sign Up, Sign In, and Dashboard
+- TailwindCSS styling with responsive design
+- Real-time sensor data updates via Firebase listeners
+- Device pairing through unique ESP32 codes
+- Protected routes (Dashboard only accessible when logged in)
+- LocalStorage-based session authentication
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🔥 Backend (Firebase Realtime Database)
+- Stores user accounts and paired devices
+- Stores sensor readings and device metadata
+- Uses environment variables (`.env`) for secure config
+- Real-time synchronization across devices & frontend
+- Simple to upgrade to Firebase Auth in the future
 
-## Expanding the ESLint configuration
+### 🐳 Docker Deployment
+- Custom Docker image for running the frontend
+- Supports Vite development server
+- Hot reload compatible
+- Multi-stage build option ready
+- Composable with n8n and additional services
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 🔄 Automation via n8n
+- Workflow triggers when:
+  - Device sends new sensor values
+  - Critical thresholds are crossed
+  - Device goes offline
+- Can send notifications via:
+  - Telegram
+  - Email
+  - Discord
+  - Webhooks
+
+---
+
+## 📁 Project Structureproject/
+│── src/
+│ ├── pages/
+│ ├── components/
+│ ├── firebase/
+│ │ └── firebase.js
+│ └── App.jsx
+│
+│── public/
+│── .env
+│── Dockerfile
+│── docker-compose.yml
+│── package.json
+└── README.md
+
+
+---
+
+## 🔧 Installation
+
+### 1️ Clone the Repository
+```bash
+git clone https://github.com/wijdanmkh-insk/Plantzen.git
+cd Plantzen
+
+### 2 Install Client Dependencies
+```bash
+npm install
+
+### 3 Create Environment File 
+Create .env in the root directory:
+VITE_API_KEY=yourApiKey
+VITE_AUTH_DOMAIN=yourproject.firebaseapp.com
+VITE_DB_URL=https://yourproject-default-rtdb.firebaseio.com
+VITE_PROJECT_ID=yourproject
+VITE_STORAGE_BUCKET=yourproject.appspot.com
+VITE_SENDER_ID=123456789
+VITE_APP_ID=1:123456789:web:abcdef123456
+
+### Run With Docker 🐳
+#### Build and Run
+```bash
+docker compose up --build
+#### Stop Containers
+```bash
+docker compose down
+
+### Access the app
+After the services are running, open:
+```bash
+http://localhost:5173
