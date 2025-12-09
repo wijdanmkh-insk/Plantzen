@@ -12,16 +12,16 @@ const RouteConfig = [
     component: "SignUp",
   },
   {
-    path: "/verify",
-    component: "Verify",
-  },
-  {
     path: "/dashboard",
     component: "Dashboard",
   },
   {
     path: "/devices",
     component: "Devices",
+  },
+  {
+    path: "/seedling",
+    component: "Plants",
   },
   {
   path: "*",
