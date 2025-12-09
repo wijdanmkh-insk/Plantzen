@@ -2,7 +2,6 @@ import {
   faChartLine, 
   faMicrochip, 
   faSeedling, 
-  faCog,
   faSignOutAlt 
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -13,10 +12,16 @@ const SidebarConfig = [
     path: "/dashboard"
   },
   {
+    label: "Plants",
+    icon: faSeedling,
+    path: "/seedling"
+  },
+  {
     label: "Devices",
     icon: faMicrochip,
     path: "/devices"
   }
+  
 ];
 
 export const LogoutItem = {
