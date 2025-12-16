@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBatteryFull, faBatteryHalf, faBatteryEmpty, faWifi, faQrcode } from "@fortawesome/free-solid-svg-icons";
 import { db } from "../firebase/firebase";
 import { ref, child, get, set, update } from "firebase/database";
+import NoDevice from "../assets/img/indicator/NoDevice.png"
 
 export default function Devices() {
   const [devices, setDevices] = useState([]);
@@ -12,6 +13,7 @@ export default function Devices() {
   const [plantName, setPlantName] = useState("");
   const [esp32Code, setEsp32Code] = useState("");
   const [adding, setAdding] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // Fetch devices from Firebase
   useEffect(() => {
@@ -50,36 +52,33 @@ export default function Devices() {
   // DELETE DEVICE
   const handleDeleteDevice = async (deviceId) => {
     const userId = localStorage.getItem("userId");
-    if (!userId) return alert("Not logged in.");
-
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this device?"
-    );
-    if (!confirmDelete) return;
+    if (!userId) return;
 
     try {
-      // Remove from user's devices
+      // Remove device from user's list
       await set(ref(db, `users/${userId}/devices/${deviceId}`), null);
 
-      // Remove device data
+      // Remove sensor data (optional)
       await set(ref(db, `devices_data/${deviceId}`), null);
 
       // Mark device as unclaimed
       await set(ref(db, `available_devices/${deviceId}`), {
         code: deviceId,
         isClaimed: false,
-        claimedBy: null
+        claimedBy: null,
       });
 
-      // Update UI
+      // Update local UI state
       setDevices((prev) => prev.filter((d) => d.deviceId !== deviceId));
 
-      alert("Device deleted successfully!");
+      // Clear confirmation UI
+      setConfirmDelete(null);
+
     } catch (error) {
       console.error("Error deleting device:", error);
-      alert("Failed to delete device.");
     }
   };
+
 
   // Handle add device
   const handleAddDevice = async (e) => {
@@ -224,7 +223,12 @@ export default function Devices() {
         <div className="lg:col-span-2 space-y-6">
           {devices.length === 0 ? (
             <div className="p-6 rounded-3xl backdrop-blur-xl bg-white/20 border border-white/30 shadow-xl text-center">
-              <p className="text-gray-700 text-lg">No devices yet. Add your first device on the right! 👉</p>
+              <div className="flex flex-col items-center justify-center">
+                <div className="">
+                  <img src={NoDevice} alt="No Devices" className="w-48 h-48 object-contain mb-4" />
+                </div>
+                <p className="text-gray-700 text-lg">No devices yet. Add your first device on the right!</p>
+              </div>
             </div>
           ) : (
             devices.map((device, idx) => {
@@ -269,13 +273,35 @@ export default function Devices() {
                       </p>
 
                       {/* DELETE BUTTON */}
+                      {confirmDelete === device.deviceId ? (
+                      <div className="flex flex-col gap-3 mt-4">
+                        <h2>Are you sure you want to delete? </h2>
+                        <div className="flex gap-2">
+                          <button
+                          onClick={() => handleDeleteDevice(device.deviceId)}
+                          className="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition"
+                          >
+                            Yes, delete
+                          </button>
+
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="px-4 py-2 rounded-xl bg-gray-400 text-white font-semibold hover:bg-gray-500 transition"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <button
-                        onClick={() => handleDeleteDevice(device.deviceId)}
+                        onClick={() => setConfirmDelete(device.deviceId)}
                         className="mt-4 px-4 py-2 rounded-xl bg-red-500 text-white 
-                        hover:bg-red-600 transition font-semibold"
+                          hover:bg-red-600 transition font-semibold"
                       >
                         Delete Device
                       </button>
+                    )}
+
                     </div>
 
                     {/* Battery */}
@@ -339,13 +365,29 @@ export default function Devices() {
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={adding}
-                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {adding ? "Adding..." : "Add Device"}
-              </button>
+              <div className="flex flex-row gap-2">
+                <button
+                  type="submit"
+                  disabled={adding}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {adding ? "Adding..." : "Add Device"}
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={adding}
+                  className="flex flex-row gap-2 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed items-center justify-center"
+                >
+                  <FontAwesomeIcon
+                  icon={faQrcode}
+                  className="text-white text-xl"
+                  />
+                  {adding ? "Adding..." : "Add Via QR"}
+                </button>
+
+                  
+              </div>
             </form>
           </div>
         </div>

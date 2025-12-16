@@ -94,6 +94,12 @@ export default function Plants() {
     );
   }
 
+  const state = selectedDevice?.currentState || {};
+  const mood = state.plantMood || "unknown";
+  const say =
+    state.plantSay || "No message yet — waiting for your ESP32 to send data.";
+  const noData = !selectedDevice?.currentState;
+
   return (
     <Layout>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
@@ -172,14 +178,21 @@ export default function Plants() {
 
               {/* Mood */}
               <div className="p-4 rounded-xl bg-green-100 border border-green-300 text-green-900 mb-6">
-                <p className="text-xl font-bold">
-                  {moodEmoji[selectedDevice.currentState.plantMood] || "🌱"}
-                  {" "}
-                  {selectedDevice.currentState.plantMood}
+                <p className="text-xl font-bold flex items-center gap-2">
+                  {moodEmoji[mood] || "🌱"}
+                  {mood === "unknown" ? "Mood unavailable" : mood}
                 </p>
-                <p className="mt-2 text-gray-800">
-                  🌿 "{selectedDevice.currentState.plantSay}"
+
+                <p className="mt-2 text-gray-800 italic">
+                  🌿 "{say}"
                 </p>
+
+                {noData && (
+                  <div className="mt-4 p-3 rounded-lg bg-yellow-200 text-yellow-900 border border-yellow-400 text-sm">
+                    ⚠️ No sensor data received yet.  
+                    Your ESP32 hasn’t uploaded any readings.
+                  </div>
+                )}
               </div>
 
               {/* ALL SENSOR VALUES */}

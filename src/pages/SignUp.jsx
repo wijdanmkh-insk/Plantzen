@@ -337,7 +337,7 @@ export default function SignUp() {
                   }
                 `}
               >
-                {isValidFormat ? "Verify Device" : "Skip Device"}
+                {isValidFormat ? "Verify Device" : "Bro, get a job to get a new device"}
               </button>
             </>
           )}

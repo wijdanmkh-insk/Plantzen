@@ -86,7 +86,7 @@ export default function SignIn() {
             className="
               absolute top-1/2 left-6 
               text-6xl font-extrabold uppercase
-              bg-gradient-to-br from-green-200 to-green-700
+              bg-white
               bg-clip-text text-transparent
             "
           >

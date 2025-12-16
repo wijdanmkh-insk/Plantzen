@@ -58,14 +58,14 @@ export default function Navbar() {
             <>
               <GoTo
                 page="SignIn"
-                className="px-6 py-3 bg-white text-green-600 rounded-md hover:bg-gray-100 transition inline-block font-semibold"
+                className="px-3 py-2 bg-white text-green-600 rounded-xl hover:bg-gray-100 transition inline-block font-semibold"
               >
                 Sign In
               </GoTo>
 
               <GoTo
                 page="SignUp"
-                className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition inline-block font-semibold"
+                className="px-3 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition inline-block font-semibold"
               >
                 Sign Up
               </GoTo>
