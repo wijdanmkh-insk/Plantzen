@@ -1,10 +1,11 @@
 // src/pages/SignUp.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Logo from "../components/Logo";
 import { db } from "../firebase/firebase";
 import { ref, set, get, update } from "firebase/database";
 import signImg from "../assets/img/signup-in/sign-in.webp";
-import LogoWhite from "/public/LogoWhite.png"
+import LogoWhite from "/public/LogoWhite.png";
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function SignUp() {
   const [step, setStep] = useState(1);
@@ -20,13 +21,15 @@ export default function SignUp() {
   const [errors, setErrors] = useState({});
   const [deviceError, setDeviceError] = useState("");
 
-  // Regex for: ESP32-XXXX-XXXX-XXXX
+  const [showQr, setShowQr] = useState(false);
+
+  // Regex ESP32
   const isValidFormat = /^ESP32-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(
     deviceCode.trim()
   );
 
   //
-  // STEP 1 — VALIDATE AND MOVE TO STEP 2
+  // STEP 1
   //
   function handleSignup(e) {
     e.preventDefault();
@@ -46,18 +49,47 @@ export default function SignUp() {
   }
 
   //
-  // STEP 2 — SAVE USER AND CLAIM DEVICE
+  // QR BUTTON
+  //
+  function handleQrClick() {
+    setShowQr(true);
+  }
+
+  //
+  // QR SCAN EFFECT
+  //
+  useEffect(() => {
+    if (!showQr) return;
+
+    const qr = new Html5Qrcode("qr-reader");
+
+    qr.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+        setDeviceCode(decodedText.trim());
+        setShowQr(false);
+        qr.stop();
+      },
+      () => {}
+    );
+
+    return () => {
+      qr.stop().catch(() => {});
+    };
+  }, [showQr]);
+
+  //
+  // STEP 2 — FINAL SUBMIT
   //
   async function handleFinalSubmit() {
     const cleaned = deviceCode.trim();
 
-    // User skips device
     if (!isValidFormat) {
       finalizeWithoutDevice();
       return;
     }
 
-    // Check available_devices
     const deviceRef = ref(db, "available_devices/" + cleaned);
     const snapshot = await get(deviceRef);
 
@@ -66,19 +98,13 @@ export default function SignUp() {
       return;
     }
 
-    const deviceInfo = snapshot.val();
-    if (deviceInfo.isClaimed) {
-      setDeviceError("This device is already claimed by another account.");
+    if (snapshot.val().isClaimed) {
+      setDeviceError("This device is already claimed.");
       return;
     }
 
-    setDeviceError("");
-
     const userId = "user_" + Date.now();
 
-    //
-    // SAVE USER
-    //
     await set(ref(db, "users/" + userId), {
       owner: ownerName,
       username,
@@ -87,30 +113,17 @@ export default function SignUp() {
         [cleaned]: {
           deviceId: cleaned,
           deviceName: deviceName || cleaned,
-          plantName: plantName || "Unknown"
+          plantName: plantName || "Unknown",
+          status: "Waiting for new data...",
+          online: false,
+          battery: 0
         }
       }
     });
 
-    //
-    // MARK DEVICE AS CLAIMED
-    //
     await update(ref(db, "available_devices/" + cleaned), {
       isClaimed: true,
       claimedBy: userId
-    });
-
-    //
-    // INITIALIZE DEVICE DATA
-    //
-
-    await set(ref(db, `users/${userId}/devices/${cleaned}`), {
-      deviceId: cleaned,
-      deviceName: deviceName,
-      plantName: plantName,
-      status: "Waiting for new data...",
-      online: false,
-      battery: 0
     });
 
     await set(ref(db, "devices_data/" + cleaned), {
@@ -132,7 +145,7 @@ export default function SignUp() {
   }
 
   //
-  // USER CHOSE NO DEVICE
+  // NO DEVICE
   //
   async function finalizeWithoutDevice() {
     const userId = "user_" + Date.now();
@@ -156,192 +169,122 @@ export default function SignUp() {
 
   return (
     <div className="min-h-screen flex bg-linear-to-b from-green-600 to-green-900 text-white">
-      
-      {/* LEFT IMAGE */}
-      <div className="relative w-1/2 flex items-center justify-center">
-        <div className="relative w-full h-full">
-
-          <img
-            src={signImg}
-            className="w-full h-full object-cover grayscale-[0.6] contrast-50"
-          />
-
-          <div 
-            className="
-              absolute top-1/2 left-6 
-              text-6xl font-extrabold uppercase
-              bg-white
-              bg-clip-text text-transparent
-            "
-          >
-            Sign Up
-          </div>
-
-          <div className="absolute top-4 left-4">
-            <Logo src={LogoWhite}/>
-          </div>
+      {/* LEFT */}
+      <div className="relative w-1/2">
+        <img
+          src={signImg}
+          className="w-full h-full object-cover grayscale-[0.6] contrast-50"
+        />
+        <div className="absolute top-4 left-4">
+          <Logo src={LogoWhite} />
+        </div>
+        <div className="absolute top-1/2 left-6 text-6xl font-extrabold bg-white bg-clip-text text-transparent">
+          Sign Up
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
+      {/* RIGHT */}
       <div className="w-1/2 flex items-center justify-center p-10">
         <div className="w-full max-w-md">
 
-          {/* STEP 1 — ACCOUNT INFO */}
           {step === 1 && (
-            <>
-              <h1 className="text-4xl font-extrabold text-center mb-6">
-                Create Your Account
-              </h1>
+            <form onSubmit={handleSignup} className="flex flex-col gap-4">
+              <h1 className="text-4xl font-bold text-center">Create Account</h1>
 
-              <p className="text-center text-white/80 mb-8">
-                Join Plantzen today and start your journey to smarter plant care!
-              </p>
+              <input
+                placeholder="Owner Name"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                className="p-3 rounded-md bg-white/20"
+              />
 
-              <form className="flex flex-col gap-5" onSubmit={handleSignup}>
+              <input
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="p-3 rounded-md bg-white/20"
+              />
 
-                {/* Owner Name */}
-                <div>
-                  <label className="text-sm font-medium">Owner Name</label>
-                  <input
-                    type="text"
-                    value={ownerName}
-                    onChange={(e) => {
-                      setOwnerName(e.target.value);
-                      setErrors((prev) => ({ ...prev, ownerName: null }));
-                    }}
-                    placeholder="John Doe"
-                    className={`
-                      mt-1 w-full p-3 rounded-md bg-white/20 text-white border
-                      focus:outline-none focus:ring-2
-                      ${errors.ownerName ? "border-red-500 focus:ring-red-400" : "border-white/30 focus:ring-green-300"}
-                    `}
-                  />
-                  {errors.ownerName && (
-                    <p className="text-red-400 text-sm mt-1">{errors.ownerName}</p>
-                  )}
-                </div>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="p-3 rounded-md bg-white/20"
+              />
 
-                {/* Username */}
-                <div>
-                  <label className="text-sm font-medium">Username</label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value);
-                      setErrors((prev) => ({ ...prev, username: null }));
-                    }}
-                    placeholder="plantmaster123"
-                    className={`
-                      mt-1 w-full p-3 rounded-md bg-white/20 text-white border
-                      focus:outline-none focus:ring-2
-                      ${errors.username ? "border-red-500 focus:ring-red-400" : "border-white/30 focus:ring-green-300"}
-                    `}
-                  />
-                  {errors.username && (
-                    <p className="text-red-400 text-sm mt-1">{errors.username}</p>
-                  )}
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="text-sm font-medium">Password</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setErrors((prev) => ({ ...prev, password: null }));
-                    }}
-                    placeholder="••••••••"
-                    className={`
-                      mt-1 w-full p-3 rounded-md bg-white/20 text-white border
-                      focus:outline-none focus:ring-2
-                      ${errors.password ? "border-red-500 focus:ring-red-400" : "border-white/30 focus:ring-green-300"}
-                    `}
-                  />
-                  {errors.password && (
-                    <p className="text-red-400 text-sm mt-1">{errors.password}</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  className="mt-2 w-full p-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-md transition"
-                >
-                  Continue
-                </button>
-              </form>
-
-              <p className="text-center text-white/70 text-sm mt-4">
-                Already have an account?{" "}
-                <a href="/sign-in" className="text-green-300 hover:underline">Log in</a>
-              </p>
-            </>
+              <button className="bg-green-500 p-3 rounded-md font-semibold">
+                Continue
+              </button>
+            </form>
           )}
 
-          {/* STEP 2 — DEVICE PAIRING */}
           {step === 2 && (
             <>
-              <h2 className="text-2xl font-extrabold text-center mb-6">
-                Pair Your ESP32 Device
+              <h2 className="text-2xl font-bold text-center mb-4">
+                Pair ESP32 Device
               </h2>
 
-              <p className="text-white/80 text-center mb-4">
-                Enter your device details and pairing code:
-              </p>
-
-              {/* Device Name */}
               <input
-                type="text"
+                placeholder="Device Name"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                placeholder="Example: My Basil Pot"
-                className="mt-1 w-full p-3 rounded-md bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="w-full p-3 mb-2 rounded-md bg-white/20"
               />
 
-              {/* Plant Name */}
               <input
-                type="text"
+                placeholder="Plant Name"
                 value={plantName}
                 onChange={(e) => setPlantName(e.target.value)}
-                placeholder="Example: Basil"
-                className="mt-1 w-full p-3 rounded-md bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="w-full p-3 mb-2 rounded-md bg-white/20"
               />
 
-              {/* Device Code */}
               <input
-                type="text"
-                value={deviceCode}
-                onChange={(e) => {
-                  setDeviceCode(e.target.value);
-                  setDeviceError("");
-                }}
                 placeholder="ESP32-XXXX-XXXX-XXXX"
-                className="mt-1 w-full p-3 rounded-md bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
+                value={deviceCode}
+                onChange={(e) => setDeviceCode(e.target.value)}
+                className="w-full p-3 rounded-md bg-white/20"
               />
 
               {deviceError && (
                 <p className="text-red-400 text-sm mt-1">{deviceError}</p>
               )}
 
-              <button
-                onClick={handleFinalSubmit}
-                className={`
-                  mt-4 w-full p-3 font-semibold rounded-md transition
-                  ${
+              {showQr && (
+                <div className="mt-4 bg-black/40 p-4 rounded-md">
+                  <div id="qr-reader" className="w-full" />
+                  <button
+                    onClick={() => setShowQr(false)}
+                    className="mt-2 w-full bg-red-500 p-2 rounded-md"
+                  >
+                    Cancel Scan
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={handleFinalSubmit}
+                  className={`flex-1 p-3 rounded-md font-semibold ${
                     isValidFormat
-                      ? "bg-green-500 hover:bg-green-600 text-white"
-                      : "bg-yellow-500 hover:bg-yellow-600 text-black"
-                  }
-                `}
-              >
-                {isValidFormat ? "Verify Device" : "Bro, get a job to get a new device"}
-              </button>
+                      ? "bg-green-500"
+                      : "bg-yellow-500 text-black"
+                  }`}
+                >
+                  {isValidFormat
+                    ? "Verify Device"
+                    : "Bro, get a job to get a new device"}
+                </button>
+
+                <button
+                  onClick={handleQrClick}
+                  className="p-3 bg-blue-500 rounded-md font-semibold"
+                >
+                  QR
+                </button>
+              </div>
             </>
           )}
-
         </div>
       </div>
     </div>
