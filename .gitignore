@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 .env
-.firebase
+*.firebase
 src/db/data.json
 
 # Editor directories and files
