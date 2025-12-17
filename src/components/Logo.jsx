@@ -1,4 +1,4 @@
-import defaultLogo from '../../public/logo.png';
+import defaultLogo from "../../public/logo.png";
 
 export default function Logo({ src }) {
   return (
@@ -6,7 +6,7 @@ export default function Logo({ src }) {
       <img
         src={src || defaultLogo}
         alt="Plantzen Logo"
-        className="w-32 h-auto rounded-full object-cover"
+        className="w-64 h-auto rounded-full object-cover"
       />
     </div>
   );

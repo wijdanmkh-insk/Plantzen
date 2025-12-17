@@ -1,40 +1,51 @@
 import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBatteryFull, faBatteryHalf, faBatteryEmpty, faWifi, faQrcode } from "@fortawesome/free-solid-svg-icons";
+import {
+  faBatteryFull,
+  faBatteryHalf,
+  faBatteryEmpty,
+  faWifi,
+  faQrcode
+} from "@fortawesome/free-solid-svg-icons";
+import { Html5Qrcode } from "html5-qrcode";
 import { db } from "../firebase/firebase";
 import { ref, child, get, set, update } from "firebase/database";
-import NoDevice from "../assets/img/indicator/NoDevice.png"
 
 export default function Devices() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [deviceName, setDeviceName] = useState("");
   const [plantName, setPlantName] = useState("");
   const [esp32Code, setEsp32Code] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Fetch devices from Firebase
+  const [adding, setAdding] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+
+  // 🔥 FETCH DEVICES (FILTER no_device)
   useEffect(() => {
     const fetchDevices = async () => {
       try {
         const userId = localStorage.getItem("userId");
         if (!userId) {
-          console.log("No user logged in");
           setLoading(false);
           return;
         }
 
         const dbRef = ref(db);
         const snapshot = await get(child(dbRef, `users/${userId}/devices`));
-        
+
         if (snapshot.exists()) {
           const devicesData = snapshot.val();
-          const devicesArray = Object.keys(devicesData).map((key) => ({
-            id: key,
-            ...devicesData[key]
-          }));
+
+          const devicesArray = Object.keys(devicesData)
+            .map((key) => ({
+              id: key,
+              ...devicesData[key]
+            }))
+            .filter((d) => d.deviceId && d.deviceId !== "None");
+
           setDevices(devicesArray);
         } else {
           setDevices([]);
@@ -49,155 +60,154 @@ export default function Devices() {
     fetchDevices();
   }, []);
 
+  // 📷 QR SCAN → ISI esp32Code
+  useEffect(() => {
+    if (!showQr) return;
+
+    let qr;
+
+    const startScan = async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      qr = new Html5Qrcode("qr-reader");
+
+      await qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          setEsp32Code(decodedText.trim());
+          setShowQr(false);
+        },
+        () => {}
+      );
+    };
+
+    startScan();
+
+    return () => {
+      if (qr?.isScanning) {
+        qr.stop().catch(() => {});
+      }
+    };
+  }, [showQr]);
+
   // DELETE DEVICE
   const handleDeleteDevice = async (deviceId) => {
     const userId = localStorage.getItem("userId");
-    if (!userId) return;
+    if (!userId) return alert("Not logged in.");
+
+    if (!window.confirm("Are you sure you want to delete this device?")) return;
 
     try {
-      // Remove device from user's list
       await set(ref(db, `users/${userId}/devices/${deviceId}`), null);
-
-      // Remove sensor data (optional)
       await set(ref(db, `devices_data/${deviceId}`), null);
-
-      // Mark device as unclaimed
       await set(ref(db, `available_devices/${deviceId}`), {
         code: deviceId,
         isClaimed: false,
-        claimedBy: null,
+        claimedBy: null
       });
 
-      // Update local UI state
       setDevices((prev) => prev.filter((d) => d.deviceId !== deviceId));
-
-      // Clear confirmation UI
-      setConfirmDelete(null);
-
+      alert("Device deleted successfully!");
     } catch (error) {
-      console.error("Error deleting device:", error);
+      alert("Failed to delete device.");
     }
   };
 
-
-  // Handle add device
+  // ADD DEVICE
   const handleAddDevice = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const cleaned = esp32Code.trim().toUpperCase();
-  const isValidFormat = /^ESP32-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(cleaned);
+    const cleaned = esp32Code.trim().toUpperCase();
+    const isValidFormat =
+      /^ESP32-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(cleaned);
 
-  if (!deviceName || !plantName || !esp32Code) {
-    alert("Please fill all fields");
-    return;
-  }
-
-  if (!isValidFormat) {
-    alert("Invalid device code format!");
-    return;
-  }
-
-  setAdding(true);
-
-  try {
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
-      alert("User not logged in");
+    if (!deviceName || !plantName || !esp32Code) {
+      alert("Please fill all fields");
       return;
     }
 
-    //
-    // 1️⃣ CHECK IF DEVICE EXISTS IN available_devices
-    //
-    const deviceRef = ref(db, "available_devices/" + cleaned);
-    const snap = await get(deviceRef);
-
-    if (!snap.exists()) {
-      alert("This device code does not exist in available devices.");
+    if (!isValidFormat) {
+      alert("Invalid device code format!");
       return;
     }
 
-    const deviceInfo = snap.val();
-    if (deviceInfo.isClaimed) {
-      alert("This device is already claimed by another user.");
-      return;
-    }
+    setAdding(true);
 
-    //
-    // 2️⃣ MARK DEVICE AS CLAIMED
-    //
-    await update(ref(db, "available_devices/" + cleaned), {
-      isClaimed: true,
-      claimedBy: userId
-    });
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        alert("User not logged in");
+        return;
+      }
 
-    //
-    // 3️⃣ ADD DEVICE UNDER USER ACCOUNT
-    //
-    await set(ref(db, `users/${userId}/devices/${cleaned}`), {
-      deviceId: cleaned,
-      deviceName: deviceName,
-      plantName: plantName,
-      status: "Waiting for new data...",
-      online: false,
-      battery: 0
-    });
+      const deviceRef = ref(db, "available_devices/" + cleaned);
+      const snap = await get(deviceRef);
 
-    //
-    // 4️⃣ INITIALIZE devices_data IF MISSING
-    //
-    const deviceDataRef = ref(db, "devices_data/" + cleaned);
-    const dataSnap = await get(deviceDataRef);
+      if (!snap.exists()) {
+        alert("This device code does not exist.");
+        return;
+      }
 
-    if (!dataSnap.exists()) {
-      await set(deviceDataRef, {
-        deviceName: deviceName,
-        plantName: plantName,
-        currentState: {
-          temperature: 0,
-          humidity: 0,
-          soilHumidity: 0,
-          lightIntensity: 0,
-          deviceState: "OFF",
-          battery: 100,
-          networkStrength: -100,
-          plantMood: "unknown",
-          plantSay: "Awaiting sensor data..."
-        }
+      if (snap.val().isClaimed) {
+        alert("This device is already claimed.");
+        return;
+      }
+
+      await update(deviceRef, {
+        isClaimed: true,
+        claimedBy: userId
       });
-    }
 
-    //
-    // 5️⃣ UPDATE LOCAL UI
-    //
-    setDevices(prev => [
-      ...prev,
-      {
-        id: cleaned,
+      await set(ref(db, `users/${userId}/devices/${cleaned}`), {
         deviceId: cleaned,
         deviceName,
         plantName,
         status: "Waiting for new data...",
         online: false,
         battery: 0
+      });
+
+      if (!(await get(ref(db, `devices_data/${cleaned}`))).exists()) {
+        await set(ref(db, `devices_data/${cleaned}`), {
+          deviceName,
+          plantName,
+          plantMood: "unknown",
+          plantSay: "Awaiting sensor data...",
+          currentState: {
+            temperature: 0,
+            humidity: 0,
+            soilHumidity: 0,
+            lightIntensity: 0,
+            deviceState: "OFF",
+            battery: 100,
+            networkStrength: -100
+          }
+        });
       }
-    ]);
 
-    // Reset input fields
-    setDeviceName("");
-    setPlantName("");
-    setEsp32Code("");
+      setDevices((prev) => [
+        ...prev,
+        {
+          deviceId: cleaned,
+          deviceName,
+          plantName,
+          status: "Waiting for new data...",
+          online: false,
+          battery: 0
+        }
+      ]);
 
-    alert("Device added & claimed successfully!");
+      setDeviceName("");
+      setPlantName("");
+      setEsp32Code("");
 
-  } catch (error) {
-    console.error("Error claiming device:", error);
-    alert("Failed to add device.");
-  } finally {
-    setAdding(false);
-  }
-};
-
+      alert("Device added successfully!");
+    } catch (error) {
+      alert("Failed to add device.");
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const getBatteryIcon = (battery) => {
     if (battery > 70) return faBatteryFull;
@@ -219,104 +229,34 @@ export default function Devices() {
     <Layout>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
-        {/* LEFT SIDE — Device List */}
+        {/* LEFT — DEVICE LIST */}
         <div className="lg:col-span-2 space-y-6">
           {devices.length === 0 ? (
-            <div className="p-6 rounded-3xl backdrop-blur-xl bg-white/20 border border-white/30 shadow-xl text-center">
-              <div className="flex flex-col items-center justify-center">
-                <div className="">
-                  <img src={NoDevice} alt="No Devices" className="w-48 h-48 object-contain mb-4" />
-                </div>
-                <p className="text-gray-700 text-lg">No devices yet. Add your first device on the right!</p>
-              </div>
+            <div className="p-6 rounded-3xl bg-white/20 text-center">
+              <p className="text-gray-700 text-lg">
+                No devices yet. Add your first device on the right! 👉
+              </p>
             </div>
           ) : (
             devices.map((device, idx) => {
               const batteryIcon = getBatteryIcon(device.battery);
 
               return (
-                <div
-                  key={idx}
-                  className="p-6 rounded-3xl backdrop-blur-xl bg-white/20 border border-white/30 shadow-xl"
-                >
-                  <div className="flex justify-between items-center">
-
-                    {/* LEFT: Device info */}
+                <div key={idx} className="p-6 rounded-3xl bg-white/20">
+                  <div className="flex justify-between">
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {device.plantName}
-                      </h2>
-                      <p className="text-sm text-gray-700">
-                        Device: {device.deviceName}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        ID: {device.deviceId}
-                      </p>
-
-                      <p className="mt-2 text-gray-800 font-semibold flex items-center gap-2">
-                        Status: 
-                        <span className={device.online ? "text-green-700" : "text-red-700"}>
-                          {device.status}
-                        </span>
-                      </p>
-
-                      <p className="flex items-center gap-2 text-gray-800 font-semibold mt-2">
-                        Connectivity:
-                        {device.online ? (
-                          <FontAwesomeIcon className="text-green-500" icon={faWifi} />
-                        ) : (
-                          <FontAwesomeIcon className="text-red-500" icon={faWifi} />
-                        )}
-                        <span className={device.online ? "text-green-600" : "text-red-500"}>
-                          {device.online ? "Online" : "Offline"}
-                        </span>
-                      </p>
-
-                      {/* DELETE BUTTON */}
-                      {confirmDelete === device.deviceId ? (
-                      <div className="flex flex-col gap-3 mt-4">
-                        <h2>Are you sure you want to delete? </h2>
-                        <div className="flex gap-2">
-                          <button
-                          onClick={() => handleDeleteDevice(device.deviceId)}
-                          className="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition"
-                          >
-                            Yes, delete
-                          </button>
-
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            className="px-4 py-2 rounded-xl bg-gray-400 text-white font-semibold hover:bg-gray-500 transition"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
+                      <h2 className="font-bold text-lg">{device.plantName}</h2>
+                      <p className="text-sm">Device: {device.deviceName}</p>
                       <button
-                        onClick={() => setConfirmDelete(device.deviceId)}
-                        className="mt-4 px-4 py-2 rounded-xl bg-red-500 text-white 
-                          hover:bg-red-600 transition font-semibold"
+                        onClick={() => handleDeleteDevice(device.deviceId)}
+                        className="mt-3 px-4 py-2 bg-red-500 text-white rounded-xl"
                       >
-                        Delete Device
+                        Delete
                       </button>
-                    )}
-
                     </div>
-
-                    {/* Battery */}
-                    <div className="flex flex-col items-center">
-                      <FontAwesomeIcon
-                        icon={batteryIcon}
-                        className={`text-3xl ${
-                          device.battery > 70 ? "text-green-600" :
-                          device.battery > 25 ? "text-yellow-600" :
-                          "text-red-600"
-                        }`}
-                      />
-                      <span className="text-gray-800 font-bold mt-1">
-                        {device.battery}%
-                      </span>
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={batteryIcon} className="text-3xl text-green-600" />
+                      <p>{device.battery}%</p>
                     </div>
                   </div>
                 </div>
@@ -325,73 +265,66 @@ export default function Devices() {
           )}
         </div>
 
-        {/* RIGHT SIDE — Add Device */}
-        <div className="flex flex-col justify-between">
-          <div>
-          </div>
-          
-          <div className="p-6 rounded-3xl backdrop-blur-xl bg-white/20 border border-white/30 shadow-xl h-fit">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Add New Device</h2>
-            <p className="mb-4 text-sm text-gray-800">To add a new device, assign the device code into this form. The device code itself were provided inside the box, so make sure you've input it correctly</p>
+        {/* RIGHT — ADD DEVICE */}
+        <div className="p-6 rounded-3xl bg-white/20">
+          <h2 className="text-2xl font-bold mb-2">Add New Device</h2>
+          <p className="text-sm mb-4">
+            You can add devices by submitting QR code or scanning the QR code.
+          </p>
 
-            <form onSubmit={handleAddDevice} className="space-y-3">
+          <form onSubmit={handleAddDevice} className="space-y-3">
+            <input
+              placeholder="Device Name"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white/50"
+            />
+
+            <input
+              placeholder="Plant Name"
+              value={plantName}
+              onChange={(e) => setPlantName(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white/50"
+            />
+
+            <div className="flex gap-2">
               <input
-                type="text"
-                placeholder="Device Name"
-                value={deviceName}
-                onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full p-3 rounded-xl bg-white/50 border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
+                placeholder="ESP32-XXXX-XXXX-XXXX"
+                value={esp32Code}
+                onChange={(e) => setEsp32Code(e.target.value)}
+                className="flex-1 p-3 rounded-xl bg-white/50"
               />
 
-              <input
-                type="text"
-                placeholder="Plant Name"
-                value={plantName}
-                onChange={(e) => setPlantName(e.target.value)}
-                className="w-full p-3 rounded-xl bg-white/50 border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
-              />
+              <button
+                type="button"
+                onClick={() => setShowQr(true)}
+                className="px-4 rounded-xl bg-green-600 text-white"
+              >
+                <FontAwesomeIcon icon={faQrcode} />
+              </button>
+            </div>
 
-              <div className="relative">
-                <FontAwesomeIcon
-                  icon={faQrcode}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xl"
-                />
-                <input
-                  type="text"
-                  placeholder="ESP32-QR-CODE"
-                  value={esp32Code}
-                  onChange={(e) => setEsp32Code(e.target.value)}
-                  className="w-full pl-12 p-3 rounded-xl bg-white/50 border border-white/30 focus:outline-none focus:ring-2 focus:ring-green-300"
-                />
-              </div>
-
-              <div className="flex flex-row gap-2">
+            {showQr && (
+              <div className="mt-4 bg-black/40 p-4 rounded-xl">
+                <div id="qr-reader" />
                 <button
-                  type="submit"
-                  disabled={adding}
-                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={() => setShowQr(false)}
+                  className="mt-2 w-full bg-red-500 text-white py-2 rounded-xl"
                 >
-                  {adding ? "Adding..." : "Add Device"}
+                  Cancel Scan
                 </button>
-                
-                <button
-                  type="submit"
-                  disabled={adding}
-                  className="flex flex-row gap-2 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed items-center justify-center"
-                >
-                  <FontAwesomeIcon
-                  icon={faQrcode}
-                  className="text-white text-xl"
-                  />
-                  {adding ? "Adding..." : "Add Via QR"}
-                </button>
-
-                  
               </div>
-            </form>
-          </div>
+            )}
+
+            <button
+              disabled={adding}
+              className="w-full py-3 bg-green-600 text-white rounded-xl"
+            >
+              {adding ? "Adding..." : "Add Device"}
+            </button>
+          </form>
         </div>
-        
       </div>
     </Layout>
   );

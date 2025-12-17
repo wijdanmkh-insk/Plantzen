@@ -4,8 +4,10 @@ import Logo from "../components/Logo";
 import { db } from "../firebase/firebase";
 import { ref, set, get, update } from "firebase/database";
 import signImg from "../assets/img/signup-in/sign-in.webp";
-import LogoWhite from "/public/LogoWhite.png";
 import { Html5Qrcode } from "html5-qrcode";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEye, faEyeSlash, faQrcode } from "@fortawesome/free-solid-svg-icons";
+
 
 export default function SignUp() {
   const [step, setStep] = useState(1);
@@ -13,6 +15,7 @@ export default function SignUp() {
   const [ownerName, setOwnerName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [deviceCode, setDeviceCode] = useState("");
   const [plantName, setPlantName] = useState("");
@@ -23,14 +26,10 @@ export default function SignUp() {
 
   const [showQr, setShowQr] = useState(false);
 
-  // Regex ESP32
   const isValidFormat = /^ESP32-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(
     deviceCode.trim()
   );
 
-  //
-  // STEP 1
-  //
   function handleSignup(e) {
     e.preventDefault();
     const newErrors = {};
@@ -48,40 +47,41 @@ export default function SignUp() {
     setStep(2);
   }
 
-  //
-  // QR BUTTON
-  //
   function handleQrClick() {
+    setDeviceError("");
     setShowQr(true);
   }
 
-  //
-  // QR SCAN EFFECT
-  //
+  // 📷 QR SCAN → LANGSUNG ISI FORM
   useEffect(() => {
     if (!showQr) return;
 
-    const qr = new Html5Qrcode("qr-reader");
+    let qr;
 
-    qr.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      (decodedText) => {
-        setDeviceCode(decodedText.trim());
-        setShowQr(false);
-        qr.stop();
-      },
-      () => {}
-    );
+    const startScan = async () => {
+      await new Promise((r) => setTimeout(r, 100)); // tunggu DOM
+      qr = new Html5Qrcode("qr-reader");
+
+      await qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          // ⬇️ INI YANG LU MINTA
+          setDeviceCode(decodedText.trim());
+          setShowQr(false);
+        }
+      );
+    };
+
+    startScan();
 
     return () => {
-      qr.stop().catch(() => {});
+      if (qr?.isScanning) {
+        qr.stop().catch(() => {});
+      }
     };
   }, [showQr]);
 
-  //
-  // STEP 2 — FINAL SUBMIT
-  //
   async function handleFinalSubmit() {
     const cleaned = deviceCode.trim();
 
@@ -144,9 +144,6 @@ export default function SignUp() {
     window.location.href = "/sign-in";
   }
 
-  //
-  // NO DEVICE
-  //
   async function finalizeWithoutDevice() {
     const userId = "user_" + Date.now();
 
@@ -169,27 +166,33 @@ export default function SignUp() {
 
   return (
     <div className="min-h-screen flex bg-linear-to-b from-green-600 to-green-900 text-white">
-      {/* LEFT */}
       <div className="relative w-1/2">
         <img
           src={signImg}
           className="w-full h-full object-cover grayscale-[0.6] contrast-50"
         />
         <div className="absolute top-4 left-4">
-          <Logo src={LogoWhite} />
+          <Logo/>
         </div>
         <div className="absolute top-1/2 left-6 text-6xl font-extrabold bg-white bg-clip-text text-transparent">
           Sign Up
         </div>
       </div>
 
-      {/* RIGHT */}
       <div className="w-1/2 flex items-center justify-center p-10">
         <div className="w-full max-w-md">
 
+          {/* STEP 1 */}
           {step === 1 && (
             <form onSubmit={handleSignup} className="flex flex-col gap-4">
-              <h1 className="text-4xl font-bold text-center">Create Account</h1>
+              <h1 className="text-4xl font-bold text-center">
+                Create Account
+              </h1>
+
+              {/* ✅ TEXT YANG LU MINTA */}
+              <p className="text-center text-white/80 text-sm">
+                To use the features, please log in
+              </p>
 
               <input
                 placeholder="Owner Name"
@@ -205,13 +208,25 @@ export default function SignUp() {
                 className="p-3 rounded-md bg-white/20"
               />
 
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="p-3 rounded-md bg-white/20"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 pr-12 rounded-md bg-white/20"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2
+                            text-white/70 hover:text-white transition"
+                >
+                  <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                </button>
+              </div>
+
 
               <button className="bg-green-500 p-3 rounded-md font-semibold">
                 Continue
@@ -219,11 +234,18 @@ export default function SignUp() {
             </form>
           )}
 
+          {/* STEP 2 */}
           {step === 2 && (
             <>
-              <h2 className="text-2xl font-bold text-center mb-4">
+              <h2 className="text-2xl font-bold text-center mb-2">
                 Pair ESP32 Device
               </h2>
+
+              {/* ✅ TEXT YANG LU MINTA */}
+              <p className="text-center text-white/80 text-sm mb-4">
+                If you have the device, add it by using the QR code reader or
+                input the code directly to the form
+              </p>
 
               <input
                 placeholder="Device Name"
@@ -242,7 +264,10 @@ export default function SignUp() {
               <input
                 placeholder="ESP32-XXXX-XXXX-XXXX"
                 value={deviceCode}
-                onChange={(e) => setDeviceCode(e.target.value)}
+                onChange={(e) => {
+                  setDeviceCode(e.target.value);
+                  setDeviceError("");
+                }}
                 className="w-full p-3 rounded-md bg-white/20"
               />
 
@@ -262,25 +287,28 @@ export default function SignUp() {
                 </div>
               )}
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-1">
                 <button
+                  type="button"
                   onClick={handleFinalSubmit}
                   className={`flex-1 p-3 rounded-md font-semibold ${
                     isValidFormat
-                      ? "bg-green-500"
-                      : "bg-yellow-500 text-black"
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : "bg-yellow-500 hover:bg-yellow-600 text-black"
                   }`}
                 >
-                  {isValidFormat
-                    ? "Verify Device"
-                    : "Bro, get a job to get a new device"}
+                  {isValidFormat ? "Verify Device" : "Bro, get a job!"}
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleQrClick}
-                  className="p-3 bg-blue-500 rounded-md font-semibold"
+                  className="flex-1 p-3 rounded-md font-semibold 
+                            bg-green-500 hover:bg-green-600 text-white
+                            flex items-center justify-center gap-2"
                 >
-                  QR
+                  <FontAwesomeIcon icon={faQrcode} />
+                  Add Device By QR
                 </button>
               </div>
             </>

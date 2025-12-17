@@ -4,7 +4,6 @@ import SidebarConfig, { LogoutItem } from "../data/SidebarConfig";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Logo from "./Logo";
-import LogoWhite from '../../public/LogoWhite.png';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -46,7 +45,7 @@ export default function Sidebar() {
     >
       {/* LOGO */}
       <div className="px-6 mb-6">
-        <Logo src="../../public/LogoWhite.png"/>
+        <Logo/>
       </div>
 
       {/* USER PROFILE (Avatar on top, name below) */}
